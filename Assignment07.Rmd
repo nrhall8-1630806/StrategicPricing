@@ -1,0 +1,50 @@
+---
+title: "Assingment 07"
+author: "Nick Hall"
+date: "5/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/nickr/OneDrive/Documents/ECON 487/Assignment02/Data")
+library(ggplot2)
+library(randomForest)
+library(reshape2)
+library(glmnet)
+library(MLmetrics)
+df <- read.csv("oj.csv")
+```
+
+Random forrest
+```{r}
+df$price <- log(df$price)
+oj.rf <- randomForest(logmove ~ price + price * brand + price * feat + EDUC + ETHNIC + INCOME + HHLARGE, data = df, ntree = 100, keep.forest = TRUE) 
+df$pred_logmove_rf = predict(oj.rf) 
+df$resid2 <- 	(df$logmove - df$pred_logmove_rf)^2 
+```
+
+```{r}
+mse_RF <- mean(df$resid2)
+mse_RF
+```
+
+```{r}
+x <- model.matrix(~  price + price * brand + price * feat + EDUC + ETHNIC + INCOME + HHLARGE , data=df)
+y <- as.numeric(as.matrix(df$logmove))
+set.seed(720)
+lasso_v1 <- cv.glmnet(x, y, type.measure = 'mse', keep = T, alpha=1)
+lambda.id <- which(lasso_v1$lambda == lasso_v1$lambda.min)
+mse_L <- MSE(lasso_v1$fit[, lambda.id], y)
+mse_L
+```
+
+```{r}
+ggplot(data = df, aes(logmove, pred_logmove_rf)) +
+  geom_point()
+ggplot(data = df, aes(price, pred_logmove_rf)) +
+  geom_jitter(aes(colour = brand)) 
+ggplot(data = df, aes(price, logmove)) +
+  geom_jitter(aes(colour = brand)) 
+```
+For the different prices, the predicted logmove seems to be similar to that of the observed with a smaller distribution at each price point.

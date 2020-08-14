@@ -1,0 +1,182 @@
+---
+title: "Assignment03"
+author: "Nick Hall"
+date: "4/17/2020"
+output: html_document
+---
+3)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/nickr/OneDrive/Documents/ECON 487/Assignment02/Data")
+library("ggplot2")
+library("dplyr")
+library(MLmetrics)
+df <- read.csv("oj.csv")
+set.seed(123)
+```
+
+1
+a)
+```{r}
+model <- lm(logmove~log(price)*brand*feat+AGE60+EDUC+ETHNIC+INCOME+HHLARGE+WORKWOM+HVAL150+SSTRDIST
+            +SSTRVOL+CPDIST5+CPWVOL5, data = df)
+summary(model)
+```
+
+b)
+```{r}
+tval2 <- summary(model)[["coefficients"]][6:16, "t value"] > 2
+tval2
+```
+
+
+c)
+```{r}
+logmove_hat <- predict(model)
+fairR <- cor(logmove_hat, df$logmove)^2
+fairR
+NoDemModel = lm(logmove~log(price)*brand*feat,df)
+logmove_hatNoDem <- predict(NoDemModel)
+fairRNoDem <- cor(logmove_hatNoDem,df$logmove)^2
+fairRNoDem
+fairR-fairRNoDem
+```
+d)i)
+ii)
+```{r}
+set.seed(1000)
+sampledFTrain <- sample_frac(df,.8)
+sampledFTest <- setdiff(df, sampledFTrain)
+```
+iii)
+```{r}
+
+model80Dem <- lm(logmove~log(price)*brand*feat+AGE60+EDUC+ETHNIC+INCOME+HHLARGE+WORKWOM+HVAL150+SSTRDIST
+            +SSTRVOL+CPDIST5+CPWVOL5, sampledFTrain)
+model80NoDem <- lm(logmove~log(price)*brand*feat, sampledFTrain)
+mean((sampledFTrain$logmove - (predict(model80Dem)))^2)
+mean((sampledFTrain$logmove - (predict(model80NoDem)))^2)
+
+```
+
+```{r}
+model20Dem <- lm(logmove~log(price)*brand*feat+AGE60+EDUC+ETHNIC+INCOME+HHLARGE+WORKWOM+HVAL150+SSTRDIST
+            +SSTRVOL+CPDIST5+CPWVOL5, sampledFTest)
+model20NoDem <- lm(logmove~log(price)*brand*feat, sampledFTest)
+mean((sampledFTest$logmove - (predict(model20Dem)))^2)
+mean((sampledFTest$logmove - (predict(model20NoDem)))^2)
+```
+
+
+```{r}
+#Checking if MSE values were correct with new package
+MSE(model80Dem$fitted.values, sampledFTrain$logmove)
+MSE(model80NoDem$fitted.values, sampledFTrain$logmove)
+MSE(model20Dem$fitted.values, sampledFTest$logmove)
+MSE(model20NoDem$fitted.values, sampledFTest$logmove)
+```
+
+The trained model has a lower MSE telling us that its data has a smaller spread about the mean and since the test model has a higher MSE its values are more spread about the mean. This would make sense because the trained set contains more data than the test set.
+
+
+2)
+a)
+```{r}
+summary(df$EDUC)["Mean"]
+summary(df$HHLARGE)["Mean"]
+```
+
+The mean for Education is 0.2252196 and the mean for HHLARGE is 0.1156024
+
+b)
+i)
+```{r}
+coef(model)["HHLARGE"]
+summary(df$HHLARGE)["3rd Qu."]
+```
+
+```{r}
+HHLARGE_Median <- exp(coef(model)["HHLARGE"]) *
+  exp(summary(df$HHLARGE)["Median"])
+HHLARGE_Median
+HHLARGE_ThirdQ <- exp(coef(model)["HHLARGE"])*
+  exp(summary(df$HHLARGE)["3rd Qu."])
+HHLARGE_ThirdQ
+HHLARGE_difference <- HHLARGE_ThirdQ - HHLARGE_Median
+HHLARGE_difference
+```
+As HHLARGE moves from the median to the 75th percentile, logmove increases by around 1%.
+
+ii)
+```{r}
+coef(model)["EDUC"]
+summary(df$EDUC)["3rd Qu."]
+EDUC_Median <- exp(coef(model)["EDUC"])*exp(summary(df$EDUC)["Median"])
+EDUC_Median
+EDUC_ThirdQ <- exp(coef(model)["EDUC"])*exp(summary(df$EDUC)["3rd Qu."])
+EDUC_ThirdQ
+EDUC_difference <- EDUC_ThirdQ - EDUC_Median
+EDUC_difference
+```
+
+As EDUC moves from the median to the 75th percentile, logmove increases by about 18.5%
+
+iii) Based on these numbers, Education would be a more important predictor of demand as it causes a larger increase in logmove.
+
+c)
+```{r}
+model2 <- lm(logmove ~ log(price)*brand*feat*HHLARGE*EDUC + AGE60 + ETHNIC + INCOME + WORKWOM + HVAL150 + SSTRDIST + SSTRVOL + CPDIST5 + CPWVOL5, data = df)
+summary(model2)
+```
+i) The coefficient of log(price)HHLARGE is -5.9000923 and the coefficient of log(price)EDUC is -1.680543
+
+ii) The HHLARGE is now more price sensitive than EDUC which would make sense because if you have a larger household you have to buy more orange juice in general, making you more sensitive to the price.
+
+iii) The HHLARGE coefficient is now 5.438765 and the EDUC coefficinet is now 1.051418. Compared to our original model, both coefficients are now  larger as well as HHLARGE is now positive rather than negative.
+
+iv)
+```{r}
+coef(model2)["HHLARGE"]
+summary(df$HHLARGE)["3rd Qu."]
+HHLARGE_Median2 <- exp(coef(model2)["HHLARGE"])*exp(summary(df$HHLARGE)["Median"])
+HHLARGE_Median2
+HHLarge_ThirdQ2 <- exp(coef(model2)["HHLARGE"])*exp(summary(df$HHLARGE)["3rd Qu."])
+HHLarge_ThirdQ2
+HHLARGE_difference2 <- HHLarge_ThirdQ2 - HHLARGE_Median2
+HHLARGE_difference2
+coef(model2)["EDUC"]
+summary(df$EDUC)["3rd Qu."]
+EDUC_Median2 <- exp(coef(model2)["EDUC"])*exp(summary(df$EDUC)["Median"])
+EDUC_Median2
+EDUC_ThirdQ2 <- exp(coef(model2)["EDUC"])*exp(summary(df$EDUC)["3rd Qu."])
+EDUC_ThirdQ2
+EDUC_difference2 <- EDUC_ThirdQ2 - EDUC_Median2
+EDUC_difference2
+```
+With the new model, as HHLARGE moves from the median to the 75th percentile, logmove increasesby 623% where as for the same move for education, its logmove only increased by 20.4%.
+
+d) HHLARGE is now positive and has a larger effect on demand. This makes sense because people are more price sensative since large households have to buy more orange juice while trying to get it at the cheapest price.
+
+3)
+a)
+i)
+```{r}
+Df1 <- df
+Df1$week <- Df1$week + 1
+Df2 <- merge(df, Df1, by = c("brand", "store", "week"))
+```
+
+ii)
+```{r}
+colnames(Df2)[6] <- "current_price"
+colnames(Df2)[20] <- "lagged_price"
+```
+
+b)
+```{r}
+model3 <- lm(logmove.x ~ log(current_price) + log(lagged_price), Df2)
+summary(model3)
+```
+
+c)
+According to the model, the current price is more elastic than the lagged price. The lagged price's elasticity is positive, while the current price elasticity is negative meaning that if last week's prices were higher than the current weeks prices, they would sell more OJ in the current week.

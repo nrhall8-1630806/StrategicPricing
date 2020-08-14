@@ -1,0 +1,436 @@
+---
+title: "Assignment 09"
+author: "Nick Hall"
+date: "6/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/nickr/OneDrive/Documents/ECON 487/Assignment02/Data")
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(MLmetrics)
+library(glmnet)
+library(reshape2)
+library(rpart)
+library(rpart.plot)
+library(partykit)
+library(permute)
+library(maptree)
+library(randomForest)
+df <- read.csv("oj.csv")
+```
+
+
+```{r}
+Q <- exp(df$logmove)
+df <- df %>% 
+  cbind(Q)
+```
+
+
+```{r}
+Df1 <- ddply(df, c('store','week'),function(x) c(weighted_mean = weighted.mean(x$price,x$Q)))
+```
+
+
+```{r}
+dfm <- df %>% 
+  merge(Df1, by = c('store', "week"))
+```
+
+
+```{r}
+dataToPass<-dfm[,c("store", "brand","weighted_mean","AGE60","EDUC","ETHNIC","INCOME","HHLARGE","WORKWOM","HVAL150","SSTRDIST","SSTRVOL","CPDIST5","CPWVOL5")]
+```
+
+
+```{r}
+fit<-rpart(as.formula(weighted_mean ~ .),data=dataToPass,method="anova",cp=0.007)
+```
+
+
+```{r}
+dataToPass$leaf = fit$where
+
+```
+
+```{r}
+DFL <- dfm
+DFL$week <- DFL$week + 1
+
+lagged <- merge(df, DFL, by = c("brand", "store", "week"))
+
+oj_pricesL <- lagged[,1:21]
+oj_wideL <- dcast(oj_pricesL, store + week ~ brand)
+colnames(oj_wideL)[3] <- "P_DomL"
+colnames(oj_wideL)[4] <- "P_MML"
+colnames(oj_wideL)[5] <- "P_TropL"
+
+oj_crossL <- merge(lagged, oj_wideL, by = c("week", "store"))
+
+oj_pricesC <- dfm[,1:6]
+oj_wideC <- dcast(oj_pricesC, store + week ~ brand)
+colnames(oj_wideC)[3] <- "P_DomC"
+colnames(oj_wideC)[4] <- "P_MMC"
+colnames(oj_wideC)[5] <- "P_TropC"
+
+
+oj_cross <- merge(oj_crossL, oj_wideC, by = c("week", "store"))
+```
+
+
+```{r}
+oj_cross$price.x = log(oj_cross$price.x)
+oj_cross$price.y = log(oj_cross$price.y)
+oj_cross$P_DomC = log(oj_cross$P_DomC)
+oj_cross$P_MMC = log(oj_cross$P_MMC)
+oj_cross$P_TropC = log(oj_cross$P_TropC)
+oj_cross$P_DomL = log(oj_cross$P_DomL)
+oj_cross$P_MML = log(oj_cross$P_MML)
+oj_cross$P_TropL = log(oj_cross$P_TropL)
+
+datatoPassSub <- dataToPass %>% 
+  select("store", "brand", "weighted_mean", "leaf")
+oj_data <- merge(datatoPassSub, oj_cross,  by = c("weighted_mean", "store", "brand"))
+oj_leaf_L <- oj_data %>% 
+  filter(leaf == 2)
+oj_leaf_M <- oj_data %>% 
+  filter(leaf == 4)
+oj_leaf_R <- oj_data %>% 
+  filter(leaf == 5)
+```
+
+
+```{r}
+oj_leaf_L_D <- oj_leaf_L %>% 
+  filter(brand == "dominicks")
+oj_leaf_L_MM <- oj_leaf_L %>% 
+  filter(brand == "minute.maid")
+oj_leaf_L_T <- oj_leaf_L %>% 
+  filter(brand == "tropicana")
+oj_leaf_M_D <- oj_leaf_M %>% 
+  filter(brand == "dominicks")
+oj_leaf_M_MM <- oj_leaf_M %>% 
+  filter(brand == "minute.maid")
+oj_leaf_M_T <- oj_leaf_M %>% 
+  filter(brand == "tropicana")
+oj_leaf_R_D <- oj_leaf_R %>% 
+  filter(brand == "dominicks")
+oj_leaf_R_MM <- oj_leaf_R %>% 
+  filter(brand == "minute.maid")
+oj_leaf_R_T <- oj_leaf_R %>% 
+  filter(brand == "tropicana")
+```
+
+Left
+```{r}
+#Dominicks quantity
+oj_L_D_Q <- randomForest(logmove.x ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_D, ntree=100, keep.forest = TRUE)
+
+#Price
+oj_L_D_P <- randomForest(price.x ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_D, ntree=100, keep.forest = TRUE)
+
+#Price w/ MM
+oj_L_D_PMM <- randomForest(P_MMC ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_D, ntree=100, keep.forest = TRUE)
+
+#Price w/ TROP
+oj_L_D_PTrop <- randomForest(P_TropC ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_D, ntree=100, keep.forest = TRUE)
+```
+
+```{r}
+#MM quantity
+oj_L_MM_Q <- randomForest(logmove.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_MM, ntree=100, keep.forest = TRUE)
+#Price
+oj_L_MM_P <- randomForest(price.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_MM, ntree=100, keep.forest = TRUE)
+
+#Price w/ Dom
+oj_L_MM_PDom <- randomForest(P_DomC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_MM, ntree=100, keep.forest = TRUE)
+
+#Price w/ Trop
+oj_L_MM_PTrop <- randomForest(P_TropC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_MM, ntree=100, keep.forest = TRUE)
+```
+
+```{r}
+#Trop quantity
+oj_L_Trop_Q <- randomForest(logmove.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_T, ntree=100, keep.forest = TRUE)
+#Price
+oj_L_Trop_P <- randomForest(price.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_T, ntree=100, keep.forest = TRUE)
+
+#Price w/ Dom
+oj_L_Trop_PDom <- randomForest(P_DomC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_T, ntree=100, keep.forest = TRUE)
+
+#Price w/ MM
+oj_L_Trop_PMM <- randomForest(P_MMC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_T, ntree=100, keep.forest = TRUE)
+```
+
+Middle
+```{r}
+#Dom quantity
+oj_M_D_Q <- randomForest(logmove.x ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_D, ntree=100, keep.forest = TRUE)
+#Price
+oj_M_D_P <- randomForest(price.x ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_D, ntree=100, keep.forest = TRUE)
+#Price w/ MM
+oj_M_D_PMM <- randomForest(P_MMC ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_D, ntree=100, keep.forest = TRUE)
+#Price w/ Trop
+oj_M_D_PTrop <- randomForest(P_TropC ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_D, ntree=100, keep.forest = TRUE)
+```
+
+```{r}
+#MM Quantity
+oj_M_MM_Q <- randomForest(logmove.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_MM, ntree=100, keep.forest = TRUE)
+#Price
+oj_M_MM_P <- randomForest(price.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_MM, ntree=100, keep.forest = TRUE)
+#Price w/ Dom
+oj_M_MM_PDom <- randomForest(P_DomC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_MM, ntree=100, keep.forest = TRUE)
+#Price w/ Trop
+oj_M_MM_PTrop <- randomForest(P_TropC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_MM, ntree=100, keep.forest = TRUE)
+```
+
+```{r}
+#Trop Quantity
+oj_M_Trop_Q <- randomForest(logmove.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_T, ntree=100, keep.forest = TRUE)
+#Trop Price
+oj_M_Trop_P <- randomForest(price.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_T, ntree=100, keep.forest = TRUE)
+#Price w/ Dom
+oj_M_Trop_PDom <- randomForest(P_DomC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_T, ntree=100, keep.forest = TRUE)
+#Price w/ MM
+oj_M_Trop_PMM <- randomForest(P_MMC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_M_T, ntree=100, keep.forest = TRUE)
+```
+
+
+Right
+```{r}
+#Dom Quantity
+oj_R_D_Q <- randomForest(logmove.x ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_D, ntree=100, keep.forest = TRUE)
+#Price
+oj_R_D_P <- randomForest(price.x ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_D, ntree=100, keep.forest = TRUE)
+#Price w/ MM
+oj_R_D_PMM <- randomForest(P_MMC ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_D, ntree=100, keep.forest = TRUE)
+#Price w/ Trop
+oj_R_D_PTrop <- randomForest(P_TropC ~ price.y * brand * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_D, ntree=100, keep.forest = TRUE)
+```
+
+```{r}
+#MM Quantity
+oj_R_MM_Q <- randomForest(logmove.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_MM, ntree=100, keep.forest = TRUE)
+#Price
+oj_R_MM_P <- randomForest(price.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_MM, ntree=100, keep.forest = TRUE)
+#Price w/ Dom
+oj_R_MM_PDom <- randomForest(P_DomC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_MM, ntree=100, keep.forest = TRUE)
+#Price w/ Trop
+oj_R_MM_PTrop <- randomForest(P_TropC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_TropL * INCOME.y + price.y * P_DomL * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_MM, ntree=100, keep.forest = TRUE)
+```
+
+```{r}
+#Trop Quantity
+oj_R_Trop_Q <- randomForest(logmove.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_T, ntree=100, keep.forest = TRUE)
+#Price
+oj_R_Trop_P <- randomForest(price.x ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_T, ntree=100, keep.forest = TRUE)
+#Price w/ Dom
+oj_R_Trop_PDom <- randomForest(P_DomC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_T, ntree=100, keep.forest = TRUE)
+#Price w/ MM
+oj_R_Trop_PMM <- randomForest(P_MMC ~ price.y * brand * feat.y + P_DomL * INCOME.y + P_MML * INCOME.y + price.y * P_DomL * P_MML + ETHNIC.y * price.y + ETHNIC.y * P_DomL + ETHNIC.y * P_MML + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_R_T, ntree=100, keep.forest = TRUE)
+```
+
+```{r}
+#Left leaf Dom Residuals
+oj_leaf_L_D$pred_Dlogmove_rf = predict(oj_L_D_Q)  
+oj_leaf_L_D$resid2 = (oj_leaf_L_D$logmove.x - oj_leaf_L_D$pred_Dlogmove_rf) 
+
+oj_leaf_L_D$pred_DPrice_rf = predict(oj_L_D_P)  
+oj_leaf_L_D$Presid2 = (oj_leaf_L_D$price.x - oj_leaf_L_D$pred_DPrice_rf) 
+
+oj_leaf_L_D$pred_DPriceMM_rf = predict(oj_L_D_PMM)  
+oj_leaf_L_D$PMMresid2 = (oj_leaf_L_D$P_MMC - oj_leaf_L_D$pred_DPriceMM_rf) 
+
+oj_leaf_L_D$pred_DPriceTrop_rf = predict(oj_L_D_PTrop)  
+oj_leaf_L_D$PTropresid2 = (oj_leaf_L_D$P_TropC - oj_leaf_L_D$pred_DPriceTrop_rf) 
+```
+
+```{r}
+#Left leaf MM Residuals
+oj_leaf_L_MM$pred_MMlogmove_rf = predict(oj_L_MM_Q)  
+oj_leaf_L_MM$resid2 = (oj_leaf_L_MM$logmove.x - oj_leaf_L_MM$pred_MMlogmove_rf) 
+
+oj_leaf_L_MM$pred_MMPrice_rf = predict(oj_L_MM_P)  
+oj_leaf_L_MM$Presid2 = (oj_leaf_L_MM$price.x - oj_leaf_L_MM$pred_MMPrice_rf) 
+
+oj_leaf_L_MM$pred_MMPriceDom_rf = predict(oj_L_MM_PDom)  
+oj_leaf_L_MM$PDomresid2 = (oj_leaf_L_MM$P_MMC - oj_leaf_L_MM$pred_MMPriceDom_rf) 
+
+oj_leaf_L_MM$pred_MMPriceTrop_rf = predict(oj_L_MM_PTrop)  
+oj_leaf_L_MM$PTropresid2 = (oj_leaf_L_MM$P_TropC - oj_leaf_L_MM$pred_MMPriceTrop_rf) 
+```
+
+
+```{r}
+#Left leaf Trop Residuals
+oj_leaf_L_T$pred_Troplogmove_rf = predict(oj_L_Trop_Q)  
+oj_leaf_L_T$resid2 = (oj_leaf_L_T$logmove.x - oj_leaf_L_T$pred_Troplogmove_rf) 
+
+oj_leaf_L_T$pred_TropPrice_rf = predict(oj_L_Trop_P)  
+oj_leaf_L_T$Presid2 = (oj_leaf_L_T$price.x - oj_leaf_L_T$pred_TropPrice_rf) 
+
+oj_leaf_L_T$pred_TropPriceDom_rf = predict(oj_L_Trop_PDom)  
+oj_leaf_L_T$PDomresid2 = (oj_leaf_L_T$P_DomC - oj_leaf_L_T$pred_TropPriceDom_rf) 
+
+oj_leaf_L_T$pred_TropPriceMM_rf = predict(oj_L_Trop_PMM)  
+oj_leaf_L_T$PMMresid2 = (oj_leaf_L_T$P_MMC - oj_leaf_L_T$pred_TropPriceMM_rf)
+```
+
+```{r}
+#Middle leaf Dom Residuals
+oj_leaf_M_D$pred_Dlogmove_rf = predict(oj_M_D_Q)  
+oj_leaf_M_D$resid2 = (oj_leaf_M_D$logmove.x - oj_leaf_M_D$pred_Dlogmove_rf) 
+
+oj_leaf_M_D$pred_DPrice_rf = predict(oj_M_D_P)  
+oj_leaf_M_D$Presid2 = (oj_leaf_M_D$price.x - oj_leaf_M_D$pred_DPrice_rf) 
+
+oj_leaf_M_D$pred_DPriceMM_rf = predict(oj_M_D_PMM)  
+oj_leaf_M_D$PMMresid2 = (oj_leaf_M_D$P_MMC - oj_leaf_M_D$pred_DPriceMM_rf) 
+
+oj_leaf_M_D$pred_DPriceTrop_rf = predict(oj_M_D_PTrop)  
+oj_leaf_M_D$PTropresid2 = (oj_leaf_M_D$P_TropC - oj_leaf_M_D$pred_DPriceTrop_rf) 
+```
+
+
+```{r}
+#Middle leaf MM Residuals
+oj_leaf_M_MM$pred_MMlogmove_rf = predict(oj_M_MM_Q)  
+oj_leaf_M_MM$resid2 = (oj_leaf_M_MM$logmove.x - oj_leaf_M_MM$pred_MMlogmove_rf) 
+
+oj_leaf_M_MM$pred_MMPrice_rf = predict(oj_M_MM_P)  
+oj_leaf_M_MM$Presid2 = (oj_leaf_M_MM$price.x - oj_leaf_M_MM$pred_MMPrice_rf) 
+
+oj_leaf_M_MM$pred_MMPriceDom_rf = predict(oj_M_MM_PDom)  
+oj_leaf_M_MM$PDomresid2 = (oj_leaf_M_MM$P_MMC - oj_leaf_M_MM$pred_MMPriceDom_rf) 
+
+oj_leaf_M_MM$pred_MMPriceTrop_rf = predict(oj_M_MM_PTrop)  
+oj_leaf_M_MM$PTropresid2 = (oj_leaf_M_MM$P_TropC - oj_leaf_M_MM$pred_MMPriceTrop_rf) 
+```
+
+
+```{r}
+#Middle leaf Trop Residuals
+oj_leaf_M_T$pred_Troplogmove_rf = predict(oj_M_Trop_Q)  
+oj_leaf_M_T$resid2 = (oj_leaf_M_T$logmove.x - oj_leaf_M_T$pred_Troplogmove_rf) 
+
+oj_leaf_M_T$pred_TropPrice_rf = predict(oj_M_Trop_P)  
+oj_leaf_M_T$Presid2 = (oj_leaf_M_T$price.x - oj_leaf_M_T$pred_TropPrice_rf) 
+
+oj_leaf_M_T$pred_TropPriceDom_rf = predict(oj_M_Trop_PDom)  
+oj_leaf_M_T$PDomresid2 = (oj_leaf_M_T$P_DomC - oj_leaf_M_T$pred_TropPriceDom_rf) 
+
+oj_leaf_M_T$pred_TropPriceMM_rf = predict(oj_M_Trop_PMM)  
+oj_leaf_M_T$PMMresid2 = (oj_leaf_M_T$P_MMC - oj_leaf_M_T$pred_TropPriceMM_rf)
+```
+
+
+```{r}
+#Right leaf Dom Residuals
+oj_leaf_R_D$pred_Dlogmove_rf = predict(oj_R_D_Q)  
+oj_leaf_R_D$resid2 = (oj_leaf_R_D$logmove.x - oj_leaf_R_D$pred_Dlogmove_rf) 
+
+oj_leaf_R_D$pred_DPrice_rf = predict(oj_R_D_P)  
+oj_leaf_R_D$Presid2 = (oj_leaf_R_D$price.x - oj_leaf_R_D$pred_DPrice_rf) 
+
+oj_leaf_R_D$pred_DPriceMM_rf = predict(oj_R_D_PMM)  
+oj_leaf_R_D$PMMresid2 = (oj_leaf_R_D$P_MMC - oj_leaf_R_D$pred_DPriceMM_rf) 
+
+oj_leaf_R_D$pred_DPriceTrop_rf = predict(oj_R_D_PTrop)  
+oj_leaf_R_D$PTropresid2 = (oj_leaf_R_D$P_TropC - oj_leaf_R_D$pred_DPriceTrop_rf) 
+```
+
+
+```{r}
+#Right leaf MM Residuals
+oj_leaf_R_MM$pred_MMlogmove_rf = predict(oj_R_MM_Q)  
+oj_leaf_R_MM$resid2 = (oj_leaf_R_MM$logmove.x - oj_leaf_R_MM$pred_MMlogmove_rf) 
+
+oj_leaf_R_MM$pred_MMPrice_rf = predict(oj_R_MM_P)  
+oj_leaf_R_MM$Presid2 = (oj_leaf_R_MM$price.x - oj_leaf_R_MM$pred_MMPrice_rf) 
+
+oj_leaf_R_MM$pred_MMPriceDom_rf = predict(oj_R_MM_PDom)  
+oj_leaf_R_MM$PDomresid2 = (oj_leaf_R_MM$P_MMC - oj_leaf_R_MM$pred_MMPriceDom_rf) 
+
+oj_leaf_R_MM$pred_MMPriceTrop_rf = predict(oj_R_MM_PTrop)  
+oj_leaf_R_MM$PTropresid2 = (oj_leaf_R_MM$P_TropC - oj_leaf_R_MM$pred_MMPriceTrop_rf) 
+```
+
+
+```{r}
+#Right leaf Trop Residuals
+oj_leaf_R_T$pred_Troplogmove_rf = predict(oj_R_Trop_Q)  
+oj_leaf_R_T$resid2 = (oj_leaf_R_T$logmove.x - oj_leaf_R_T$pred_Troplogmove_rf) 
+
+oj_leaf_R_T$pred_TropPrice_rf = predict(oj_R_Trop_P)  
+oj_leaf_R_T$Presid2 = (oj_leaf_R_T$price.x - oj_leaf_R_T$pred_TropPrice_rf) 
+
+oj_leaf_R_T$pred_TropPriceDom_rf = predict(oj_R_Trop_PDom)  
+oj_leaf_R_T$PDomresid2 = (oj_leaf_R_T$P_DomC - oj_leaf_R_T$pred_TropPriceDom_rf) 
+
+oj_leaf_R_T$pred_TropPriceMM_rf = predict(oj_R_Trop_PMM)  
+oj_leaf_R_T$PMMresid2 = (oj_leaf_R_T$P_MMC - oj_leaf_R_T$pred_TropPriceMM_rf)
+```
+
+
+```{r}
+#Building models
+InfModelDomL <- lm(resid2 ~ Presid2 + PMMresid2 + PTropresid2, oj_leaf_L_D)
+InfModelMML <- lm(resid2 ~ Presid2 + PDomresid2 + PTropresid2, oj_leaf_L_MM)
+InfModelTropL <- lm(resid2 ~ Presid2 + PDomresid2 + PMMresid2, oj_leaf_L_T)
+
+InfModelDomM <- lm(resid2 ~ Presid2 + PMMresid2 + PTropresid2, oj_leaf_M_D)
+InfModelMMM <- lm(resid2 ~ Presid2 + PDomresid2 + PTropresid2, oj_leaf_M_MM)
+InfModelTropM <- lm(resid2 ~ Presid2 + PDomresid2 + PMMresid2, oj_leaf_M_T)
+
+InfModelDomR <- lm(resid2 ~ Presid2 + PMMresid2 + PTropresid2, oj_leaf_R_D)
+InfModelMMR <- lm(resid2 ~ Presid2 + PDomresid2 + PTropresid2, oj_leaf_R_MM)
+InfModelTropR <- lm(resid2 ~ Presid2 + PDomresid2 + PMMresid2, oj_leaf_R_T)
+```
+
+```{r}
+Left_Dom_Vec <- c(InfModelDomL$coefficients[2], InfModelDomL$coefficients[3], InfModelDomL$coefficients[4])
+Left_MM_Vec <- c(InfModelMML$coefficients[3], InfModelMML$coefficients[2], InfModelMML$coefficients[4])
+Left_Trop_Vec <- c(InfModelTropL$coefficients[3], InfModelTropL$coefficients[4], InfModelTropL$coefficients[2])
+Left_Matrix <- rbind(Left_Dom_Vec, Left_MM_Vec, Left_Trop_Vec)
+colnames(Left_Matrix) <- c("Dominicks", "Minute Maid", "Tropicana")
+row.names(Left_Matrix) <- c("Dominicks", "Minute Maid", "Tropicana")
+
+Middle_Dom_Vec <- c(InfModelDomM$coefficients[2], InfModelDomM$coefficients[3], InfModelDomM$coefficients[4])
+Middle_MM_Vec <- c(InfModelMMM$coefficients[3], InfModelMMM$coefficients[2], InfModelMMM$coefficients[4])
+Middle_Trop_Vec <- c(InfModelTropM$coefficients[3], InfModelTropM$coefficients[4], InfModelTropM$coefficients[2])
+Middle_Matrix <- rbind(Middle_Dom_Vec, Middle_MM_Vec, Middle_Trop_Vec)
+colnames(Middle_Matrix) <- c("Dominicks", "Minute Maid", "Tropicana")
+row.names(Middle_Matrix) <- c("Dominicks", "Minute Maid", "Tropicana")
+
+Right_Dom_Vec <- c(InfModelDomR$coefficients[2], InfModelDomR$coefficients[3], InfModelDomR$coefficients[4])
+Right_MM_Vec <- c(InfModelMMR$coefficients[3], InfModelMMR$coefficients[2], InfModelMMR$coefficients[4])
+Right_Trop_Vec <- c(InfModelTropR$coefficients[3], InfModelTropR$coefficients[4], InfModelTropR$coefficients[2])
+Right_Matrix <- rbind(Right_Dom_Vec, Right_MM_Vec, Right_Trop_Vec)
+colnames(Right_Matrix) <- c("Dominicks", "Minute Maid", "Tropicana")
+row.names(Right_Matrix) <- c("Dominicks", "Minute Maid", "Tropicana")
+```
+
+```{r}
+Left_Matrix
+Middle_Matrix
+Right_Matrix
+```
+
+
+```{r}
+olsModel <- lm(logmove.x ~ price.y * feat.y + P_MML * INCOME.y + P_TropL * INCOME.y + price.y * P_MML * P_TropL + ETHNIC.y * price.y + ETHNIC.y * P_MML + ETHNIC.y * P_TropL + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_leaf_L_D)
+```
+
+```{r}
+oj_leaf_L_D$olsModel <- olsModel$residuals
+oj_leaf_L_D$residuals <- InfModelDomL$residuals
+
+ggplot(data = oj_leaf_L_D, aes(olsModel, residuals)) +
+  geom_point()
+```
+They relatively seem to be along a 45 degree line, but the random forests residuals seem to have less of a spread than the OLS model.

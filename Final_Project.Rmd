@@ -1,0 +1,302 @@
+---
+title: "Final Project"
+author: "Nick Hall"
+date: "6/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/nickr/OneDrive/Documents/ECON 487")
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(tidyr)
+df <- read.csv("online_retail.csv")
+only_customers <- read.csv("online_retail.csv")
+only_customers <- na.omit(only_customers)
+df_2011 = read.csv("online_retail_2011.csv")
+```
+
+
+```{r, echo=FALSE, message=FALSE, results='hide', error=FALSE}
+#Splitting the data in order to find the top four customers by their amount of spending
+df$revenue <- (df$Quantity * df$UnitPrice)
+customer_spending <- df %>% 
+  group_by(CustomerID) %>% 
+  summarise(total_revenue = sum(revenue), .groups = 'drop') 
+customer_spending <- customer_spending %>% 
+  arrange(desc(total_revenue))
+top_four <- customer_spending %>% 
+  slice(2:5)
+```
+
+```{r}
+#Finding the percentage of revenue that the top 4 customers bring in
+total_revenue <- df %>% 
+  select(revenue) %>% 
+  summarise(total_revenue = sum(revenue), .groups = 'drop')
+top_four_revenue <- top_four %>% 
+  select(total_revenue) %>% 
+  summarise(total_revenue = sum(total_revenue))
+top_four_perc_rev <- (top_four_revenue[1,1] / total_revenue[1,1]) * 100
+top_four_perc_rev
+```
+
+```{r}
+# Extract Top 10 Products
+
+products<- df %>%
+   group_by(Description) %>%
+   summarise(Quantity = sum(Quantity), .groups = 'drop')
+
+#Arranging the data frame by quantity
+product_df = products %>% 
+  arrange(desc(Quantity))
+```
+
+
+```{r}
+#Storing Top 10 Products into DF
+top_10_products = product_df %>% 
+  slice(1:10)
+top_10_products
+```
+
+
+```{r}
+#Getting the top 4 and top 10 product descriptions
+top_4_products_desc = as.vector(top_10_products$Description[1:4])
+top_10_products_desc = as.vector(top_10_products$Description)
+```
+
+```{r}
+#Creating a for loop to make a data frame of the top four products
+top_4_df <- data.frame()
+start = 1
+n = 0
+for (i in 1:4) {
+  count_df <- df %>% 
+    filter(Description == top_10_products$Description[i])
+  n = nrow(count_df) + n
+  top_4_df[start:n,1:9] <- df %>% 
+    filter(Description == top_10_products$Description[i])
+  start = nrow(count_df) + start
+}
+```
+
+
+```{r}
+#Creating a for loop to create a top 10 products data frame
+top_10_df <- data.frame()
+start = 1
+n = 0
+for (i in 1:10) {
+  count_df <- df %>% 
+    filter(Description == top_10_products$Description[i])
+  n = nrow(count_df) + n
+  top_10_df[start:n,1:9] <- df %>% 
+    filter(Description == top_10_products$Description[i])
+  start = nrow(count_df) + start
+}
+```
+
+```{r}
+#Finding the sum of the revenue of the top four and top ten products
+sum(top_4_df$revenue)
+sum(top_10_df$revenue)
+```
+
+
+
+```{r}
+#Percentage of Revenue Comprised by Top 10 Products
+(sum(top_4_df$revenue) / sum(df$revenue)) * 100
+(sum(top_10_df$revenue) / sum(df$revenue)) * 100
+```
+
+```{r}
+#Crating a data Frame of the top ten and four revenue items
+top_10_prod_rev <- df %>%
+  group_by(Description) %>% 
+  summarise(Total_Revenue = sum(revenue), .groups = 'drop') %>% 
+  top_n(10, Total_Revenue) %>% 
+  arrange(desc(Total_Revenue))
+
+top_4_prod_rev <- df %>%
+  group_by(Description) %>% 
+  summarise(Total_Revenue = sum(revenue), .groups = 'drop') %>% 
+  top_n(4, Total_Revenue) %>% 
+  arrange(desc(Total_Revenue))
+```
+
+```{r}
+#finding total Revenue and percent of total revenue for the top four and ten products 
+sum(top_4_prod_rev$Total_Revenue)
+(sum(top_4_prod_rev$Total_Revenue) / sum(df$revenue)) * 100
+sum(top_10_prod_rev$Total_Revenue)
+(sum(top_10_prod_rev$Total_Revenue) / sum(df$revenue)) * 100
+```
+
+
+
+```{r, echo=FALSE, message=FALSE, results='hide', error=FALSE}
+#Creating a year based data frame w/o returns
+df_2011_no_returns = subset(df_2011, Quantity > 0)
+#Separating Data by Year 2011
+by_month = df_2011_no_returns %>%
+  separate(InvoiceDate, c('m'))%>% 
+  count(m)
+```
+
+
+```{r}
+#Making month numbers a numeric so it can be ordered properly
+by_month$m = as.numeric(by_month$m)
+```
+
+
+```{r}
+#Ordering Data by Months
+ordered_months = by_month[order(by_month$m),]
+```
+
+
+```{r}
+#Bar plot to represent order frequency by month
+chart = barplot(ordered_months$n, main='Frequency by Month', xlab=c('Months'), ylab=c('Count'), names.arg=c('Jan','Feb','Mar','April','May','June','July','Aug','Sept','Oct','Nov','Dec'))
+
+text(chart, 0, round(ordered_months$n, 1), cex=.75, pos=3)
+
+```
+
+
+```{r}
+#splitting out the data for the top 4 customers of the top four products and combining it into a data frame
+dro <- df %>% 
+  filter(CustomerID == "14096")
+dro2 <- df %>% 
+  filter(CustomerID == "15061")
+dro3 <- df %>% 
+  filter(CustomerID == "15465")
+dro4 <- df %>% 
+  filter(CustomerID == "17949")
+dro_small <- rbind(dro, dro2, dro3, dro4)
+```
+
+
+```{r}
+#Creating a data frame for data to be entered into and creating a counter
+new_df <- data.frame()
+n <- 1
+
+#Making a for loop in order to find the total quantity, total revenue and total number of unique items each of the 
+#top four customers purchased
+for (i in unique(dro_small$CustomerID)) {
+  new_df[n,1:4] <- dro_small %>% 
+    filter(CustomerID == i) %>% 
+    select(CustomerID, Quantity, revenue, Description) %>% 
+    group_by(CustomerID) %>% 
+    summarise(Total_Quantity = sum(Quantity), Total_Revenue = sum(revenue), Total_Items = length(unique(Description)), .groups = 'drop')
+  n = n+1
+}
+```
+
+
+```{r}
+#Creating a data frame for data to be entered into and a counter
+rs <- data.frame()
+c <- 1
+
+#Creating a for loop in order to find the total number of unique items that a customer bought per customer
+for (i in unique(only_customers$CustomerID)) {
+  rs[c,1:2] <- only_customers %>% 
+    filter(CustomerID == i) %>% 
+    group_by(CustomerID) %>% 
+    summarise(Total_Items = length(unique(Description)), .groups = 'drop')
+  c = c + 1
+}
+
+#Finding the average number of unique items that the consumers bought
+avg_items <- rs %>% 
+  summarise(Average_Per_Customer = mean(Total_Items))
+avg_items
+```
+
+```{r}
+#subsetting the products into individual data sets
+
+set1 = subset(df, Description=='WORLD WAR 2 GLIDERS ASSTD DESIGNS')
+set2 = subset(df, Description=='JUMBO BAG RED RETROSPOT')
+set3 = subset(df, Description=='ASSORTED COLOUR BIRD ORNAMENT')
+set4 = subset(df, Description=='POPCORN HOLDER')
+```
+
+
+```{r}
+#Pulling only necessary data for models
+set1 <- set1 %>% 
+  filter(Quantity > 0) %>% 
+  select(Quantity, UnitPrice)
+set2 <- set2 %>% 
+  filter(UnitPrice > 0) %>%
+  filter(Quantity > 0) %>% 
+  select(Quantity, UnitPrice)
+set3 <- set3 %>% 
+  filter(Quantity > 0) %>% 
+  select(Quantity, UnitPrice)
+set4 <- set4 %>% 
+  filter(Quantity > 0) %>% 
+  select(Quantity, UnitPrice)
+```
+
+
+```{r}
+#Finding the elasticities of the top 4 products sold by quantity
+elast_1 = lm(log(Quantity) ~ log(UnitPrice), data=set1 )
+elast_2 = lm(log(Quantity) ~ log(UnitPrice), data=set2 )
+elast_3 = lm(log(Quantity) ~ log(UnitPrice), data=set3 )
+elast_4 = lm(log(Quantity) ~ log(UnitPrice), data=set4 )
+```
+
+
+```{r}
+#Printing out the elasticities of the products
+elast_1
+elast_2
+elast_3
+elast_4
+```
+
+```{r}
+#Finding data for each individual country
+Countries <- df %>% 
+  group_by(Country) %>% 
+  summarise(Total_Quantity = sum(Quantity), Total_Revenue = sum(revenue), .groups = 'drop')
+```
+
+```{r}
+Countries_rev <- Countries %>% 
+  select(Country, Total_Revenue) %>%
+  top_n(5, Total_Revenue) %>% 
+  arrange(desc(Total_Revenue))
+Countries_rev
+```
+
+```{r}
+Countries_Q <- Countries %>% 
+  select(Country, Total_Quantity) %>% 
+  top_n(5, Total_Quantity) %>% 
+  arrange(desc(Total_Quantity))
+Countries_Q
+  
+```
+
+```{r}
+print("Please give us game passes, we're broke and without proper gaming ability.")
+print("If demands are not met we will be forced to fully support Sony in their PS5 endavours with full force.")
+print("We will also put full support into everything apple does, because they will be our god.")
+print("We thank you for everything you've taught us, but the game pass would be really cool <3 :).")
+```
+
+

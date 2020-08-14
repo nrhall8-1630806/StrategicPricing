@@ -1,0 +1,177 @@
+---
+title: "Assignment 08"
+author: "Nick Hall"
+date: "5/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/nickr/OneDrive/Documents/ECON 487/Assignment02/Data")
+library(ggplot2)
+library(randomForest)
+library(reshape2)
+library(glmnet)
+library(MLmetrics)
+library(dplyr)
+df <- read.csv("oj.csv")
+```
+
+```{r}
+df_1 <- df
+df_1$week <- df_1$week + 1
+df_2 <- merge(df, df_1, by = c("brand", "store", "week"))
+colnames(df_2)[6] <- "current_price"
+colnames(df_2)[20] <- "lagged_price"
+Df_use <- df_2[sample(nrow(df_2)),]
+oj_prices <- Df_use[,1:6]
+oj_wide <- dcast(oj_prices, store + week ~ brand)
+colnames(oj_wide)[3] <- "P_Dom"
+colnames(oj_wide)[4] <- "P_MM"
+colnames(oj_wide)[5] <- "P_Trop"
+oj_cross <- merge(Df_use, oj_wide, by = c("week", "store"))
+```
+
+```{r}
+oj_cross$lagged_price <- log(oj_cross$lagged_price)
+oj.rf <-randomForest(logmove.y ~ lagged_price*brand*feat.y + AGE60.y + EDUC.y + ETHNIC.y + INCOME.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_cross, ntree = 100, keep.forest = TRUE)
+oj_cross$pred_logmove_rf = predict(oj.rf) 
+oj_cross$resid2 <- 	(oj_cross$logmove.y - oj_cross$pred_logmove_rf)
+```
+
+
+```{r}
+mse_RF <- mean(oj_cross$resid2)
+mse_RF
+```
+
+
+```{r}
+oj_cross$current_price <- log(oj_cross$current_price)
+oj.rf2 <-randomForest(current_price ~ lagged_price*brand*feat.y + AGE60.y + EDUC.y + ETHNIC.y + INCOME.y + HHLARGE.y + WORKWOM.y + HVAL150.y, data = oj_cross, ntree = 100, keep.forest = TRUE)
+oj_cross$pred_price_rf = predict(oj.rf2) 
+oj_cross$resid2price <- 	(oj_cross$current_price - oj_cross$pred_price_rf)
+```
+
+```{r}
+mse_RF_P <- mean(oj_cross$resid2price)
+mse_RF_P
+```
+
+```{r}
+Infmod <- lm(resid2 ~ resid2price, oj_cross)
+summary(Infmod)
+```
+```{r}
+trop.df <- oj_cross %>% 
+  filter(brand == "tropicana")
+mm.df <- oj_cross %>% 
+  filter(brand == "minute.maid")
+dom.df <- oj_cross %>% 
+  filter(brand == "dominicks")
+```
+
+
+
+
+```{r}
+oj.rft = randomForest(logmove.x ~ lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, trop.df, ntree=100, keep.forest = TRUE) 
+
+trop.df$pred_Troplogmove_rf = predict(oj.rft)  
+
+trop.df$resid2 = (trop.df$logmove.x - trop.df$pred_Troplogmove_rf) 
+
+oj.rftp = randomForest(current_price ~  lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, trop.df, ntree=100, keep.forest = TRUE) 
+
+trop.df$pred_Tropprice_rf = predict(oj.rftp)  
+
+trop.df$Presid2 = (trop.df$current_price - trop.df$pred_Tropprice_rf) 
+
+RFtropvMM= randomForest(P_MM ~  lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, trop.df, ntree=100, keep.forest = TRUE)
+
+trop.df$pred_P_MM_rf = predict(RFtropvMM)  
+
+trop.df$PMMresid2 = (trop.df$P_MM - trop.df$pred_P_MM_rf) 
+
+RFtropvdom = randomForest(P_Dom ~  lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, trop.df, ntree=100, keep.forest = TRUE)
+
+trop.df$pred_P_Dom_rf = predict(RFtropvdom)  
+
+trop.df$PDomresid2 = (trop.df$P_Dom - trop.df$pred_P_Dom_rf)
+```
+
+
+```{r}
+oj.rfmm = randomForest(logmove.x ~ lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, mm.df, ntree=100, keep.forest = TRUE) 
+
+mm.df$pred_mmlogmove_rf = predict(oj.rfmm)  
+
+mm.df$resid2 = (mm.df$logmove.x - mm.df$pred_mmlogmove_rf) 
+
+oj.rfmmp = randomForest(current_price ~  lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, mm.df, ntree=100, keep.forest = TRUE) 
+
+mm.df$pred_mmprice_rf = predict(oj.rfmmp)  
+
+mm.df$Presid2 = (mm.df$current_price - mm.df$pred_mmprice_rf) 
+
+RFmmvtrop= randomForest(P_Trop ~  lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, mm.df, ntree=100, keep.forest = TRUE)
+
+mm.df$pred_P_mmvtrop_rf = predict(RFmmvtrop)  
+
+mm.df$PTropresid2 = (mm.df$P_Trop - mm.df$pred_P_mmvtrop_rf) 
+
+RFmmvdom = randomForest(P_Dom ~  lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, mm.df, ntree=100, keep.forest = TRUE)
+
+mm.df$pred_P_mmvdom_rf = predict(RFmmvdom)  
+
+mm.df$PDomresid2 = (mm.df$P_Dom - mm.df$pred_P_mmvdom_rf)
+```
+
+
+
+```{r}
+oj.rfdom = randomForest(logmove.x ~ lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, dom.df, ntree=100, keep.forest = TRUE) 
+
+dom.df$pred_domlogmove_rf = predict(oj.rfdom)  
+
+dom.df$resid2 = (dom.df$logmove.x - dom.df$pred_domlogmove_rf) 
+
+oj.rfdomp = randomForest(current_price ~  lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, dom.df, ntree=100, keep.forest = TRUE) 
+
+dom.df$pred_domprice_rf = predict(oj.rfdomp)  
+
+dom.df$Presid2 = (dom.df$current_price - dom.df$pred_domprice_rf) 
+
+RFdomvtrop= randomForest(P_Trop ~  lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, dom.df, ntree=100, keep.forest = TRUE)
+
+dom.df$pred_P_domvtrop_rf = predict(RFdomvtrop)  
+
+dom.df$Ptropresid2 = (dom.df$P_Trop - dom.df$pred_P_domvtrop_rf) 
+
+RFdomvmm = randomForest(P_MM ~  lagged_price*brand*feat.y + AGE60.y + EDUC.y + INCOME.y + ETHNIC.y + HHLARGE.y + WORKWOM.y + HVAL150.y, dom.df, ntree=100, keep.forest = TRUE)
+
+dom.df$pred_P_domvmm_rf = predict(RFdomvmm)  
+
+dom.df$Pmmresid2 = (dom.df$P_MM - dom.df$pred_P_domvmm_rf)
+```
+
+```{r}
+InfmodTrop <- lm(resid2 ~ Presid2 + PMMresid2 + PDomresid2, trop.df)
+summary(InfmodTrop)
+InfmodMM <- lm(resid2 ~ Presid2 + PTropresid2 + PDomresid2, mm.df)
+summary(InfmodMM)
+InfmodDom <- lm(resid2 ~ Presid2 + Ptropresid2 + Pmmresid2, dom.df)
+summary(InfmodDom)
+```
+
+```{r}
+trop_vec <- c(InfmodTrop$coefficients[2], InfmodTrop$coefficients[3], InfmodTrop$coefficients[4])
+MM_vec <- c(InfmodMM$coefficients[3], InfmodMM$coefficients[2], InfmodMM$coefficients[4])
+Dom_vec <- c(InfmodDom$coefficients[3], InfmodDom$coefficients[4], InfmodDom$coefficients[2])
+
+Matrix_oj <- rbind(trop_vec, MM_vec, Dom_vec)
+colnames(Matrix_oj) <- c("Tropicana", "Minute Maid", "Dominicks")
+row.names(Matrix_oj) <- c("Tropicana", "Minute Maid", "Dominicks")
+Matrix_oj
+```
+

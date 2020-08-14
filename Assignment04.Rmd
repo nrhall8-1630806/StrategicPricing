@@ -1,0 +1,276 @@
+---
+title: "Assignment 4"
+author: "Nick Hall"
+date: "4/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/nickr/OneDrive/Documents/ECON 487/Assignment02/Data")
+library(ggplot2)
+library(dplyr)
+library(MLmetrics)
+library(glmnet)
+library(reshape2)
+df <- read.csv("oj.csv")
+```
+1)
+```{r}
+#setting the seed, adjusting data frame to include current and lagged price and then randomizing data frame
+set.seed(69)
+df_1 <- df
+df_1$week <- df_1$week + 1
+df_2 <- merge(df, df_1, by = c("brand", "store", "week"))
+colnames(df_2)[6] <- "current_price"
+colnames(df_2)[20] <- "lagged_price"
+RanDf <- df_2[sample(nrow(df_2)),]
+
+```
+a)
+```{r}
+#Splitting randomized data into 5 subsets
+data <- split(RanDf, rep(1:5, length.out = nrow(RanDf)))
+```
+
+```{r}
+#Assigning each subset to its own data frame
+df1 <- data$`1`
+df2 <- data$`2`
+df3 <- data$`3`
+df4 <- data$`4`
+df5 <- data$`5`
+```
+b)
+```{r}
+#Moving the data frames into each trained section
+trainDF1 <- rbind(df1, df2, df3, df4)
+trainDF2 <- rbind(df2, df3, df4, df5)
+trainDF3 <- rbind(df1, df3, df4, df5)
+trainDF4 <- rbind(df1, df2, df4, df5)
+trainDF5 <- rbind(df1, df2, df3, df5)
+``` 
+c)i)
+```{r}
+#Creating the model for the first set of trained data and using it to calculate the MSE for the trained and testing group of data
+model1 <- lm(logmove.x ~ log(current_price) + feat.x + 
+               brand + brand * log(current_price) 
+             + log(lagged_price) + EDUC.x * log(current_price) + 
+               HHLARGE.x * log(current_price)  + 
+               EDUC.x + AGE60.x + ETHNIC.x + INCOME.x + HHLARGE.x + WORKWOM.x + HVAL150.x, trainDF1)
+
+
+test1 <- predict(model1, df5)
+train1 <- predict(model1, trainDF1)
+train1_mse <- MSE(train1, trainDF1$logmove.x)
+test1_mse <- MSE(test1, df5$logmove.x)
+train1_mse
+test1_mse
+
+```
+
+```{r}
+#Creating the model and getting MSE for the second group
+model2 <- lm(logmove.x ~ log(current_price) + feat.x + 
+               brand + brand * log(current_price) 
+             + log(lagged_price) + EDUC.x * log(current_price) + 
+               HHLARGE.x * log(current_price)  + 
+               EDUC.x + AGE60.x + ETHNIC.x + INCOME.x + HHLARGE.x + WORKWOM.x + HVAL150.x, trainDF2)
+
+
+test2 <- predict(model2, df1)
+train2 <- predict(model2, trainDF2)
+train2_mse <- MSE(train2, trainDF2$logmove.x)
+test2_mse <- MSE(test2, df1$logmove.x)
+train2_mse
+test2_mse
+```
+
+```{r}
+#Creating the model and getting MSE for the third group
+model3 <- lm(logmove.x ~ log(current_price) + feat.x + 
+               brand + brand * log(current_price) 
+             + log(lagged_price) + EDUC.x * log(current_price) + 
+               HHLARGE.x * log(current_price)  + 
+               EDUC.x + AGE60.x + ETHNIC.x + INCOME.x + HHLARGE.x + WORKWOM.x + HVAL150.x, trainDF3)
+
+
+test3 <- predict(model3, df2)
+train3 <- predict(model3, trainDF3)
+train3_mse <- MSE(train3, trainDF3$logmove.x)
+test3_mse <- MSE(test3, df2$logmove.x)
+train3_mse
+test3_mse
+```
+
+```{r}
+#Creating the model and getting MSE for the fourth group
+model4 <- lm(logmove.x ~ log(current_price) + feat.x + 
+               brand + brand * log(current_price) 
+             + log(lagged_price) + EDUC.x * log(current_price) + 
+               HHLARGE.x * log(current_price)  + 
+               EDUC.x + AGE60.x + ETHNIC.x + INCOME.x + HHLARGE.x + WORKWOM.x + HVAL150.x, trainDF4)
+
+
+test4 <- predict(model4, df3)
+train4 <- predict(model4, trainDF4)
+train4_mse <- MSE(train4, trainDF4$logmove.x)
+test4_mse <- MSE(test4, df3$logmove.x)
+train4_mse
+test4_mse
+```
+
+```{r}
+#Creating the model and getting MSE for the final group
+model5 <- lm(logmove.x ~ log(current_price) + feat.x + 
+               brand + brand * log(current_price) 
+             + log(lagged_price) + EDUC.x * log(current_price) + 
+               HHLARGE.x * log(current_price)  + 
+               EDUC.x + AGE60.x + ETHNIC.x + INCOME.x + HHLARGE.x + WORKWOM.x + HVAL150.x, trainDF5)
+
+
+test5 <- predict(model5, df4)
+train5 <- predict(model5, trainDF5)
+train5_mse <- MSE(train5, trainDF5$logmove.x)
+test5_mse <- MSE(test5, df4$logmove.x)
+train5_mse
+test5_mse
+```
+ii)
+```{r}
+#Getting the average MSE for the trained and test groups
+mean_mse_train <- (train1_mse + train2_mse + train3_mse + train4_mse + train5_mse) / 5
+mean_mse_test <- (test1_mse + test2_mse + test3_mse + test4_mse + test5_mse) / 5
+mean_mse_train
+mean_mse_test
+```
+2)
+b)
+```{r}
+#Creating a data frame of interesting features and running Lasso to create insightful graphs
+set.seed(69)
+oj_prices <- RanDf[,1:6]
+oj_wide <- dcast(oj_prices, store + week ~ brand)
+colnames(oj_wide)[3] <- "P_Dom"
+colnames(oj_wide)[4] <- "P_MM"
+colnames(oj_wide)[5] <- "P_Trop"
+oj_cross <- merge(RanDf, oj_wide, by = c("week", "store"))
+df_RHS <- oj_cross %>% 
+  select(week, brand, store, feat.x, logmove.x, lagged_price, feat.x, current_price, AGE60.x, EDUC.x, ETHNIC.x, INCOME.x , HHLARGE.x , WORKWOM.x , HVAL150.x, P_Dom, P_MM, P_Trop)
+
+
+
+x <- model.matrix(~ log(current_price) + feat.x + 
+               brand + brand * log(current_price) + AGE60.x * log(current_price) 
+               + HVAL150.x * log(lagged_price) + log(lagged_price) + week 
+               * log(lagged_price) +  EDUC.x * log(current_price) + ETHNIC.x * log(current_price) + 
+               feat.x * log(lagged_price) +HHLARGE.x * log(current_price)  + WORKWOM.x * 
+               log(current_price) + HVAL150.x * log(current_price) + EDUC.x + AGE60.x + ETHNIC.x + INCOME.x + HHLARGE.x + WORKWOM.x + HVAL150.x + P_Dom + P_MM + P_Trop, data = df_RHS)
+y <- as.numeric(as.matrix(df_RHS$logmove.x))
+
+lasso_v1 <- glmnet(x, y, alpha = 1)
+plot(lasso_v1)
+```
+c)
+```{r}
+#Investigating the coefficients of the model
+coef(lasso_v1, s = lasso_v1$lambda.min)
+```
+c)
+```{r}
+#Cross validation
+cvfit <- cv.glmnet(x, y, alpha = 1)
+plot(cvfit)
+
+coef(cvfit, s= "lambda.min")
+```
+The parameter the cross validated LASSO model kicked out is the interaction between the log of the current price and the brand minute maid. My ratio of number of observations to number of features is 29/25. Since the number of observations is larger than the number of features, there may be overfitting. Although, since it there is only a small difference the overfitting may be minimal.
+
+d)
+```{r}
+cvfit$lambda.min
+log(cvfit$lambda.min)
+```
+
+
+e) The LASSO model helps us validate our intuitions. It verifies if those intuitions are correct and supplies us with a correct model.
+
+```{r}
+#Making data frames per brand
+Dominicks <- oj_cross %>% 
+  filter(brand == "dominicks")
+MinMaid <- oj_cross %>% 
+  filter(brand == "minute.maid")
+Tropicana <- oj_cross %>% 
+  filter(brand == "tropicana")
+Dominicks
+```
+
+3)
+a)
+```{r}
+model3 <- lm(logmove.x ~ brand * log(current_price) + HVAL150.x * log(current_price) + INCOME.x * log(lagged_price) * feat.y + HHLARGE.x * log(current_price) + log(current_price) * log(lagged_price) + log(current_price) + EDUC.x + AGE60.x + ETHNIC.x + INCOME.x + HHLARGE.x + WORKWOM.x + HVAL150.x, oj_cross)
+summary(model3)
+```
+i) -3.34
+
+ii) -1.86
+
+iii) -1.402
+
+iv) 95% confidence interval: (-1.99064, -1.72936)
+
+
+b) Dominicks
+i) They should have the lowest markup cost, because they are the most elastic, so if they markup their products higher, they will lose more on the intrinsic margins than they will gain on the extrinsic margins.
+
+4)
+a)
+```{r}
+#Making models for each brand
+DomModel <- lm(logmove.x ~ log(P_Trop) + log(P_MM) + log(current_price) + ETHNIC.x + INCOME.x + HHLARGE.x, Dominicks)
+MM_Model <- lm(logmove.x ~ log(P_Trop) + log(P_Dom) + log(current_price) + ETHNIC.x + INCOME.x + HHLARGE.x, MinMaid)
+TropModel <- lm(logmove.x ~ log(P_Dom) + log(P_MM) + log(current_price) + ETHNIC.x + INCOME.x + HHLARGE.x, Tropicana)
+
+```
+
+
+```{r}
+Trop_Elas <- c(TropModel$coefficients[4], TropModel$coefficients[3], TropModel$coefficients[2])
+MM_Elas <- c(MM_Model$coefficients[2], MM_Model$coefficients[4], MM_Model$coefficients[3])
+Dom_Elas <- c(DomModel$coefficients[2], DomModel$coefficients[3], DomModel$coefficients[4])
+```
+
+```{r}
+Elas_Mat <- rbind(Trop_Elas, MM_Elas, Dom_Elas)
+colnames(Elas_Mat) <- c("Tropicana", "Minute Maid", "Dominicks")
+row.names(Elas_Mat) <- c("Tropicana", "Minute Maid", "Dominicks")
+Elas_Mat
+```
+
+b)
+```{r}
+
+DomModel2 <- lm(logmove.x ~ log(P_Trop) + log(P_MM) + log(current_price) + ETHNIC.x + INCOME.x + HHLARGE.x + log(current_price) * feat.x + log(P_Trop) * feat.x + log(P_MM) * feat.x, Dominicks)
+MM_Model2 <- lm(logmove.x ~ log(P_Trop) + log(P_Dom) + log(current_price) + ETHNIC.x + INCOME.x + HHLARGE.x + log(current_price) * feat.x + log(P_Trop) * feat.x + log(P_Dom) * feat.x, MinMaid)
+TropModel2 <- lm(logmove.x ~ log(P_Dom) + log(P_MM) + log(current_price) + ETHNIC.x + INCOME.x + HHLARGE.x + log(current_price) * feat.x + log(P_Dom) * feat.x + log(P_MM) * feat.x, Tropicana)
+
+Trop_Elas2 <- c(TropModel2$coefficients[4] + TropModel2$coefficients[9], TropModel2$coefficients[3] + TropModel2$coefficients[11], TropModel2$coefficients[2] + TropModel2$coefficients[10])
+MM_Elas2 <- c(MM_Model2$coefficients[2] + MM_Model2$coefficients[10], MM_Model2$coefficients[4] + MM_Model2$coefficients[9], MM_Model2$coefficients[3] + MM_Model2$coefficients[11])
+Dom_Elas2 <- c(DomModel2$coefficients[2] + DomModel2$coefficients[10], DomModel2$coefficients[3] + DomModel2$coefficients[11], DomModel2$coefficients[4] + DomModel2$coefficients[9])
+
+Elas_Mat2 <- rbind(Trop_Elas2, MM_Elas2, Dom_Elas2)
+colnames(Elas_Mat2) <- c("Tropicana", "Minute Maid", "Dominicks")
+row.names(Elas_Mat2) <- c("Tropicana", "Minute Maid", "Dominicks")
+Elas_Mat2
+```
+i)
+```{r}
+Elas_Mat - Elas_Mat2
+```
+
+ii) Tropicana would suffer the most when Minute maid is both featured and lowers its price since they have the most competition, which we can tell from their cross price elasticity being large and positive.
+
+c) i) I think that Minute Maid and Tropicana are the most competitive since their cross price elasticities are the highest when compared with eachother.
+
+ii) I think that Tropicana and Minute Maid would be more correlated in prices since they are both competing for the same consumers so if one drops its price the other must do the same. They would be more correlated than other pairs of products, because they are in competition for those consumers so their prices must stay relatively more similar than Tropicanas price.

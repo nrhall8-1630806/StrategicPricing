@@ -1,0 +1,202 @@
+---
+title: "Assignment 06"
+output:
+  html_document:
+    df_print: paged
+Author: Nick Hall
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/nickr/OneDrive/Documents/ECON 487/Assignment02/Data")
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(MLmetrics)
+library(glmnet)
+library(reshape2)
+library(rpart)
+library(rpart.plot)
+library(partykit)
+library(permute)
+library(maptree)
+df <- read.csv("oj.csv")
+```
+
+1)
+a)
+```{r}
+Q <- exp(df$logmove)
+df <- df %>% 
+  cbind(Q)
+```
+
+b)
+```{r}
+Df1 <- ddply(df, c('store','week'),function(x) c(weighted_mean = weighted.mean(x$price,x$Q)))
+Df1
+```
+
+```{r}
+df <- df %>% 
+  merge(Df1, by = c('store', "week"))
+df
+```
+
+2)
+a) first code chunk
+b)
+```{r}
+dataToPass<-df[,c("store", "brand","weighted_mean","AGE60","EDUC","ETHNIC","INCOME","HHLARGE","WORKWOM","HVAL150","SSTRDIST","SSTRVOL","CPDIST5","CPWVOL5")]
+```
+
+```{r}
+fit<-rpart(as.formula(weighted_mean ~ .),data=dataToPass,method="anova",cp=0.007)
+```
+
+c)
+
+```{r}
+draw.tree(fit)
+```
+
+d)
+```{r}
+dataToPass$leaf = fit$where
+
+```
+
+3)
+
+```{r}
+
+oj_prices <- df[,1:6]
+oj_wide <- dcast(oj_prices, store + week ~ brand)
+colnames(oj_wide)[3] <- "P_Dom"
+colnames(oj_wide)[4] <- "P_MM"
+colnames(oj_wide)[5] <- "P_Trop"
+
+oj_move<- df[,1:4]
+oj_wide2 <- dcast(oj_move, store + week ~ brand)
+colnames(oj_wide2)[3] <-"Logmove_D"
+colnames(oj_wide2)[4] <-"Logmove_MM"
+colnames(oj_wide2)[5] <-"Logmove_T"
+
+oj_movecross<-merge(oj_wide, oj_wide2, by = c('week', 'store'))
+
+oj_cross <- merge(df, oj_movecross, by = c("week", "store"))
+datatoPassSub <- dataToPass %>% 
+  select("store", "brand", "weighted_mean", "leaf")
+oj_data <- merge(oj_cross, datatoPassSub, by = c("weighted_mean", "store", "brand"))
+oj_leaf_L <- oj_data %>% 
+  filter(leaf == 2)
+oj_leaf_M <- oj_data %>% 
+  filter(leaf == 4)
+oj_leaf_R <- oj_data %>% 
+  filter(leaf == 5)
+oj_leaf_L_D <- oj_leaf_L %>% 
+  filter(brand == "dominicks")
+oj_leaf_L_MM <- oj_leaf_L %>% 
+  filter(brand == "minute.maid")
+oj_leaf_L_T <- oj_leaf_L %>% 
+  filter(brand == "tropicana")
+oj_leaf_M_D <- oj_leaf_M %>% 
+  filter(brand == "dominicks")
+oj_leaf_M_MM <- oj_leaf_M %>% 
+  filter(brand == "minute.maid")
+oj_leaf_M_T <- oj_leaf_M %>% 
+  filter(brand == "tropicana")
+oj_leaf_R_D <- oj_leaf_R %>% 
+  filter(brand == "dominicks")
+oj_leaf_R_MM <- oj_leaf_R %>% 
+  filter(brand == "minute.maid")
+oj_leaf_R_T <- oj_leaf_R %>% 
+  filter(brand == "tropicana")
+```
+
+```{r}
+reg_intL <- glm(logmove~log(price)*brand*feat, data=oj_leaf_L)
+summary(reg_intL)
+reg_intM <- glm(logmove~log(price)*brand*feat, data=oj_leaf_M)
+summary(reg_intM)
+reg_intR <- glm(logmove~log(price)*brand*feat, data=oj_leaf_R)
+summary(reg_intR)
+```
+b)
+```{r}
+reg_L_D <- glm(Logmove_D~log(P_Dom)*feat*brand + log(P_Trop)*feat*brand + log(P_MM)*feat*brand, data=oj_leaf_L)
+summary(reg_L_D)
+reg_L_MM <- glm(Logmove_MM~log(P_Dom)*feat*brand + log(P_Trop)*feat*brand + log(P_MM)*feat*brand, data=oj_leaf_L)
+summary(reg_L_MM)
+reg_L_T <- glm(Logmove_T~log(P_Dom)*feat*brand + log(P_Trop)*feat*brand + log(P_MM)*feat*brand, data=oj_leaf_L)
+summary(reg_L_T)
+reg_M_D <- glm(Logmove_D~log(P_Dom)*feat*brand + log(P_Trop)*feat*brand + log(P_MM)*feat*brand, data=oj_leaf_M)
+summary(reg_M_D)
+reg_M_MM <- glm(Logmove_MM~log(P_Dom)*feat*brand + log(P_Trop)*feat*brand + log(P_MM)*feat*brand, data=oj_leaf_M)
+summary(reg_M_MM)
+reg_M_T <- glm(Logmove_T~log(P_Dom)*feat*brand + log(P_Trop)*feat*brand + log(P_MM)*feat*brand, data=oj_leaf_M)
+summary(reg_M_T)
+reg_R_D <- glm(Logmove_D~log(P_Dom)*feat*brand + log(P_Trop)*feat*brand + log(P_MM)*feat*brand, data=oj_leaf_R)
+summary(reg_R_D)
+reg_R_MM <- glm(Logmove_MM~log(P_Dom)*feat*brand + log(P_Trop)*feat*brand + log(P_MM)*feat*brand, data=oj_leaf_R)
+summary(reg_R_MM)
+reg_R_T <- glm(Logmove_T~log(P_Dom)*feat*brand + log(P_Trop)*feat*brand + log(P_MM)*feat*brand, data=oj_leaf_R)
+summary(reg_R_T)
+```
+
+```{r}
+
+row1_L <- c(reg_L_D$coefficients[2], reg_L_D$coefficients[7], reg_L_D$coefficients[6])
+row2_L <- c(reg_L_MM$coefficients[2], reg_L_MM$coefficients[7], reg_L_MM$coefficients[6])
+row3_L <- c(reg_L_T$coefficients[2], reg_L_T$coefficients[7], reg_L_T$coefficients[6])
+
+matrix_L <- rbind(row1_L,row2_L,row3_L)
+colnames(matrix_L) <- c("Dominicks", "Minute Maid", "Tropicana")
+row.names(matrix_L) <- c("Dominicks", "Minute Maid", "Tropicana")
+matrix_L
+```
+
+```{r}
+row1_M <- c(reg_M_D$coefficients[2], reg_M_D$coefficients[7], reg_M_D$coefficients[6])
+row2_M <- c(reg_M_MM$coefficients[2], reg_M_MM$coefficients[7], reg_M_MM$coefficients[6])
+row3_M <- c(reg_M_T$coefficients[2], reg_M_T$coefficients[7], reg_M_T$coefficients[6])
+
+matrix_M <- rbind(row1_M,row2_M,row3_M)
+colnames(matrix_M) <- c("Dominicks", "Minute Maid", "Tropicana")
+row.names(matrix_M) <- c("Dominicks", "Minute Maid", "Tropicana")
+matrix_M
+```
+
+```{r}
+row1_R <- c(reg_R_D$coefficients[2], reg_R_D$coefficients[7], reg_R_D$coefficients[6])
+row2_R <- c(reg_R_MM$coefficients[2], reg_R_MM$coefficients[7], reg_R_MM$coefficients[6])
+row3_R <- c(reg_R_T$coefficients[2], reg_R_T$coefficients[7], reg_R_T$coefficients[6])
+
+matrix_R <- rbind(row1_R,row2_R,row3_R)
+colnames(matrix_R) <- c("Dominicks", "Minute Maid", "Tropicana")
+row.names(matrix_R) <- c("Dominicks", "Minute Maid", "Tropicana")
+matrix_R
+```
+c) Leaf1: Own price elasticity seems to be more elastic than cross price elasticity. The only product with negative cross price elasticity is Dominicks and Tropicana, which intuitively does not make very much sense.
+
+Leaf2: Own price elasticity seems to be more elastic than cross price elasticity. The only product with negative cross price elasticity is Dominicks and Tropicana, which intuitively does not make very much sense.
+
+Leaf3: Own price elasticity seems to be more elastic than cross price elasticity. The only product with negative cross price elasticity is Dominicks and Tropicana, which intuitively does not make very much sense.All products also seem to have a relatively low cross product elasticity compared to other leafs.
+
+4)
+a)
+The leaf with the highest own-price elasticity should have a lower mark up price relative to the other leaves with lower own-price elasticities
+
+b)
+For Dominicks: When own price elasticity is the highest in the leaves, the cross price elasticity for the other products seems to be the lowest.
+For Minute Maid: When own price elasticity is the highest in the leaves, Dominicks cross price elasticity seems to be decently higher than Minute Maid's lowest own price elasticity and the Tropicana cross price elasticity is the highest when Minute Maid's own price elasticity is the highest.
+For Tropicana: When own price elasticity is the highest in the leaves, the cross price elasticity for the other products seems to be the highest.
+
+i)
+If you have a high price elasticity the markup should be low because it keeps the cross price elasticity lower against other brands. 
+
+ii) 
+You would want to have sales at different times, because when the other brands are not having sales the consumer are the most elastic and willing to change brands so your can bring in more customers and have a larger volume of sales.
+
+5)
+If theta represents our utility in the equation $\theta (s2-p2) = \theta(s1-p1)$ and we know that $s2/p2$ is greater than $s1/p1$ then $(s2-p2) - (s1-p1)$ should be greater than 0 meaning our $\theta$ on the left side is larger. So the utility and value of from good 2 is higher than good 1 and so the customer would be more likely to purchase good 2 since it has a grater utility value for them.

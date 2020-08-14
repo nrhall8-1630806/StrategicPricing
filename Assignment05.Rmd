@@ -1,0 +1,72 @@
+---
+title: "Assignment 5"
+author: "Nick Hall"
+date: "5/3/2020"
+output: html_document
+---
+
+
+
+1) 
+a)
+
+```{r}
+(-2.3187 + -1.3678) * 10
+```
+
+b)
+```{r}
+0.265621 * 10
+```
+
+c) The model only gives predictions it does not supply you with the causality. So infering causality fom this model would just lead you astray.
+
+d) We would expect the sign to be positive because with a normal good when income increases so does the demand, which would also increase the price of the normal good.
+
+
+2)
+a)
+```{r}
+setwd("C:/Users/nickr/OneDrive/Documents/ECON 487/Assignment02/Data")
+df <- read.csv("oj.csv")
+
+dom_data <- subset(df, brand == "dominicks")
+quantile <- quantile(dom_data$INCOME)
+quantile
+```
+
+2b)
+```{r}
+income_data <- dom_data[order(dom_data$INCOME),]
+q1 <- income_data[income_data$INCOME <= quantile[2],]
+q2 <- income_data[income_data$INCOME > quantile[2] & income_data$INCOME <= quantile[3],]
+q3 <- income_data[income_data$INCOME > quantile[3] & income_data$INCOME <= quantile[4],]
+q4 <- income_data[income_data$INCOME > quantile[4] & income_data$INCOME <= quantile[5],]
+
+q1_avgSale <- mean(q1$logmove)
+q2_avgSale <- mean(q2$logmove)
+q3_avgSale <- mean(q3$logmove)
+q4_avgSale <- mean(q4$logmove)
+
+q1_avgSale
+q2_avgSale
+q3_avgSale
+q4_avgSale
+```
+
+2c)
+```{r}
+q1_mse <- mean((q1$logmove - q1_avgSale)^2)
+q2_mse <- mean((q2$logmove - q2_avgSale)^2)
+q3_mse <- mean((q3$logmove - q3_avgSale)^2)
+q4_mse <- mean((q4$logmove - q4_avgSale)^2)
+
+q1_mse
+q2_mse
+q3_mse
+q4_mse
+```
+
+2d) The third quantile had the lowest MSE. This lets us know that within this quantile it had the least spread about the mean.
+
+2e)The first quantile had the largest MSE. This lets us know that within this quantile it had the largest spread about the mean.
